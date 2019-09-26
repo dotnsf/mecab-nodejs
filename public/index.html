@@ -1,0 +1,49 @@
+<html>
+<head>
+<title>index</title>
+<script src="//code.jquery.com/jquery-2.2.4.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/jqcloud/1.0.4/jqcloud-1.0.4.js"></script>
+<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/jqcloud/1.0.4/jqcloud.css"/>
+<script>
+$(function(){
+});
+
+function send(){
+  var get_type = $('#get_type:checked').val();
+  var text = $('#text').val();
+  $.ajax({
+    url: '/get?' + get_type + '=' + text,
+    type: 'GET',
+    success: function( body ){
+      console.log( body.results );
+      if( body.results.length > 50 ){
+        body.results = body.results.slice( 0, 50 );
+      }
+      $('#result').jQCloud( body.results, {
+        width: 500, height: 200
+      });
+    },
+    error: function( err0, err1, err2 ){
+      console.log( err1 );
+      console.log( err2 );
+    }
+  })
+}
+</script>
+<style>
+</style>
+</head>
+<body>
+
+<form>
+  <input type="radio" id="get_type" name="get_type" value="text">Text</input>
+  <input type="radio" id="get_type" name="get_type" value="url" checked>URL</input>
+  <input type="text" id="text" style="width: 80%;" name="text"/>
+  <input type="button" value="get" onClick="send()"/>
+</form>
+
+<hr/>
+
+<div id="result"></div>
+</body>
+</html>
