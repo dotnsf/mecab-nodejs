@@ -3,7 +3,6 @@
 var express = require( 'express' ),
     bodyParser = require( 'body-parser' ),
     client = require( 'cheerio-httpcli' ),
-    ejs = require( 'ejs' ),
     MeCab = require( 'mecab-async' ),
     multer = require( 'multer' ),
     settings = require( './settings' ),
@@ -12,17 +11,9 @@ var express = require( 'express' ),
 app.use( express.Router() );
 app.use( express.static( __dirname + '/public' ) );
 
-app.set( 'views', __dirname + '/views' );
-app.set( 'view engine', 'ejs' );
-
 var mecab = new MeCab();
 mecab.command = settings.mecab_command;
 
-app.get( '/detail', function( req, res ){
-  var text = req.query.text;
-
-  res.render( 'detail', { text: text } );
-});
 
 app.get( '/get', function( req, res ){
   res.contentType( 'application/json; charset=utf-8' );
@@ -71,12 +62,16 @@ function text2morphs( text ){
         var list = [];
         morphs.forEach( function( morph ){
           //. morph = { kanji: "おはよう", lexical: "感動詞", compound: "*", compound2: "*", compound3: "*", conjugation: "*", inflection: "*", original: "おはよう", "reading": "オハヨウ", pronounciation: "オハヨー" }
-          if( [ '名詞', '動詞', '形容詞' ].indexOf( morph.lexical ) > -1 ){
+          if( [ '名詞', '代名詞', '動詞', '形容詞' ].indexOf( morph.lexical ) > -1 ){
             var word = morph.original;
             var idx = list.indexOf( word );
             if( idx == -1 ){
+              var result = {
+                text: word,
+                weight: 1
+              };
               list.push( word );
-              results.push( { text: word, weight: 1, link: '/detail?text=' + word } );
+              results.push( result );
             }else{
               results[idx].weight ++;
             }
