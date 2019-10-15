@@ -10,25 +10,28 @@ var db_username = '';
 var db_password = '';
 var db_name = '';
 var db = null;
-var cloudant = cloudantlib( { account: db_username, password: db_password } );
-if( cloudant ){
-  cloudant.db.get( db_name, function( err, body ){
-    if( err ){
-      if( err.statusCode == 404 ){
-        cloudant.db.create( db_name, function( err, body ){
-          if( err ){
-            db = null;
-          }else{
-            db = cloudant.db.use( db_name );
-          }
-        });
+var cloudant = null;
+if( db_username && db_password && db_name ){
+  cloudant = cloudantlib( { account: db_username, password: db_password } );
+  if( cloudant ){
+    cloudant.db.get( db_name, function( err, body ){
+      if( err ){
+        if( err.statusCode == 404 ){
+          cloudant.db.create( db_name, function( err, body ){
+            if( err ){
+              db = null;
+            }else{
+              db = cloudant.db.use( db_name );
+            }
+          });
+        }else{
+          db = cloudant.db.use( db_name );
+        }
       }else{
         db = cloudant.db.use( db_name );
       }
-    }else{
-      db = cloudant.db.use( db_name );
-    }
-  });
+    });
+  }
 }
 
 var mecab = new MeCab();
@@ -40,9 +43,9 @@ fs.readdir( target_folder, function( err, files ){
 
   var fileList = [];
   files.filter( function( file ){
-    return fs.statSync( file ).isFile() && /.*\.pdf$/.test( file );
+    return fs.statSync( target_folder + '/' + file ).isFile() && /.*\.pdf$/.test( target_folder + '/' + file );
   }).forEach( function( file ){
-    fileList.push( file );
+    fileList.push( target_folder + '/' + file );
   });
 
   //. fileList 内のファイルを１つずつ処理していく
@@ -63,27 +66,30 @@ function processFile( fileList, idx ){
 
     var buf = fs.readFileSync( filepath );
     pdf( buf ).then( function( data ){
-    var text = data.text.split( "\n" ).join( ' ' );
+      var text = data.text.split( "\n" ).join( ' ' );
 
-    text2morphs( text ).then( function( results ){
-      var data = { filename: tmp1[tmp1.length-1], name: name, yyyy: yyyy, nn: nn, results: results, datetime: ( new Date() ).getTime() };
-      if( db ){
-        db.insert( data, function( err, body ){
+      text2morphs( text ).then( function( results ){
+        var data = { filename: tmp1[tmp1.length-1], name: name, yyyy: yyyy, nn: nn, results: results, datetime: ( new Date() ).getTime() };
+        if( db ){
+          db.insert( data, function( err, body ){
+            setTimeout( function(){
+              processFile( fileList, idx + 1 );
+            }, 1000 );
+          });
+        }else{
+          console.log( data );
           setTimeout( function(){
             processFile( fileList, idx + 1 );
           }, 1000 );
-        });
-      }else{
-        console.log( data );
+        }
+      }, function( err ){
+        console.log( err );
         setTimeout( function(){
           processFile( fileList, idx + 1 );
         }, 1000 );
-      }
+      });
     }, function( err ){
       console.log( err );
-      setTimeout( function(){
-        processFile( fileList, idx + 1 );
-      }, 1000 );
     });
   }else{
     return idx;
@@ -135,6 +141,3 @@ function compare( a, b ){
   }
 }
 
-var port = process.env.PORT || 3000;
-app.listen( port );
-console.log( "server starting on " + port + " ..." );
