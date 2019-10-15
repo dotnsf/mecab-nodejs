@@ -1,0 +1,211 @@
+<html>
+<head>
+<title>index</title>
+<script src="//code.jquery.com/jquery-2.2.4.min.js"></script>
+<link href="//maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" rel="stylesheet"/>
+<script src="//maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/jqcloud/1.0.4/jqcloud-1.0.4.js"></script>
+<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/jqcloud/1.0.4/jqcloud.css"/>
+<script src="//cdnjs.cloudflare.com/ajax/libs/Chart.js/2.1.4/Chart.min.js"></script>
+<script>
+$(function(){
+  var keywords = [
+    "非接触決済", "キャッシュレス", "メルペイ", "メルカリ", "売上金",
+    "あと払いサービス", "フィナンシャルサービス", "マイクロサービス", "貸し倒れリスク", "ウォレット残高",
+    "ロイヤルユーザ", "決済体験", "バーコード", "キャッシュバック", "コンテンツマーケティング",
+    "決済ボリューム", "金融サービス", "ユーザ", "機械学習", "GMV",
+    "MAU", "US", "UK", "CRM", "CARTUNE",
+    "AI", "CtoC", "App", "CEO"
+  ];
+  var cnt = 0;
+  keywords.forEach( function( keyword ){
+    var a = '<a href="#" onClick="clickWord(\'' + keyword + '\');">' + keyword + '</a> ';
+    cnt ++;
+    if( cnt % 3 == 0 ){ a += '<br/>'; }
+    $('#keywords').append( a );
+  });
+
+  $('#company').change( function( e ){
+    var company = $('#company').val();
+    if( company ){
+      $.ajax({
+        type: 'GET',
+        url: 'byname?name=' + company,
+        success: function( result ){
+          console.log( result );
+          if( result && result.status ){
+            //. 50 個以上存在している場合は上位50個に絞る
+            if( result.words.length > 50 ){
+              result.words = result.words.slice( 0, 50 );
+            }
+
+            //. add click handler
+            result.words.forEach( function( word ){
+              word.handlers = {
+                click: function(){
+                  clickWord( word.text );
+                }
+              };
+            });
+
+            $('#result').jQCloud( result.words, {
+              width: 500, height: 200
+            });
+          }
+        },
+        error: function( e0, e1, e2 ){
+          console.log( e1, e2 );
+        }
+      });
+    }
+  });
+});
+
+function send(){
+  var get_type = $('#get_type:checked').val();
+  var text = $('#text').val();
+  $.ajax({
+    url: '/get?' + get_type + '=' + text,
+    type: 'GET',
+    success: function( body ){
+      //console.log( body.results );
+      //. 50 個以上存在している場合は上位50個に絞る
+      if( body.results.length > 50 ){
+        body.results = body.results.slice( 0, 50 );
+      }
+
+      //. add click handler
+      body.results.forEach( function( result ){
+        result.handlers = {
+          click: function(){
+            clickWord( result.text );
+          }
+        };
+      });
+
+      $('#result').jQCloud( body.results, {
+        width: 500, height: 200
+      });
+    },
+    error: function( err0, err1, err2 ){
+      console.log( err1 );
+      console.log( err2 );
+    }
+  })
+}
+
+var cnt = 0;
+function clickWord( word ){
+  var company = $('#company').val();
+  cnt ++;
+  var div = '<div class="card" id="card_' + cnt + '"><div class="card-header"><a href="#" class="btn btn-xs" onClick="removeCard(' + cnt + ');">&times;</a>' + word + '</div><div class="card-body"><canvas id="myCanvas_' + cnt + '"></canvas></div></div>';
+  $('#detail').append( div );
+
+  $.ajax({
+    type: 'GET',
+    url: '/bynameword?name=' + company + '&word=' + word,
+    success: function( result ){
+      //console.log( result );
+      if( result && result.status && result.weights ){
+        var labels = [], nums = [];
+        result.weights.forEach( function( w ){
+          labels.push( w.yyyy + 'Q' + w.nn );
+          nums.push( w.weight );
+        });
+
+        var r = Math.floor( Math.random() * 128 ) + 128;
+        var g = Math.floor( Math.random() * 128 ) + 128;
+        var b = Math.floor( Math.random() * 128 ) + 128;
+        var ctx = document.getElementById( 'myCanvas_' + cnt ).getContext( '2d' );
+        var myChart = new Chart( ctx, {
+          type: 'line',
+          data: {
+            labels: labels,
+            datasets: [{
+              label: word,
+              data: nums,
+              backgroundColor: 'rgba( ' + r + ', ' + g + ', ' + b + ', 0.4 )'
+            }]
+          },
+          options: {
+            legend: {
+              display: false
+            }
+          }
+        });
+      }
+    },
+    error: function( err0, err1, err2 ){
+      console.log( err1 );
+      console.log( err2 );
+    }
+  });
+
+  //. 乱数でチャートを作成
+  /*
+  var labels = [], nums = [];
+  for( var i = 0; i < 10; i ++ ){
+    labels.push( '' + ( 2010 + i ) );
+    nums.push( Math.floor( Math.random() * 100 ) );
+  }
+  var r = Math.floor( Math.random() * 128 ) + 128;
+  var g = Math.floor( Math.random() * 128 ) + 128;
+  var b = Math.floor( Math.random() * 128 ) + 128;
+  var ctx = document.getElementById( 'myCanvas_' + cnt ).getContext( '2d' );
+  var myChart = new Chart( ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: word,
+        data: nums,
+        backgroundColor: 'rgba( ' + r + ', ' + g + ', ' + b + ', 0.4 )'
+      }]
+    },
+    options: {
+      legend: {
+        display: false
+      }
+    }
+  });
+  */
+}
+
+function removeCard( idx ){
+  $('#card_'+idx).css( 'display', 'none' );
+}
+</script>
+<style>
+</style>
+</head>
+<body>
+
+<nav class="navbar navbar-light bg-light">
+  <a class="navbar-brand" href="#">sample</a>
+  <ul class="navbar-nav mr-auto"></ul>
+  <ul class="navbar-nav" id="navbar">
+  </ul>
+</nav>
+
+<div class="container">
+  <form>
+    <select id="company">
+      <option value="">（選択してください）</option>
+      <option value="Mercari">メルカリ</option>
+    </select>
+  </form>
+
+  <hr/>
+
+  <table>
+    <tr>
+      <td><div id="result"></div></td>
+      <td id="keywords">
+      </td>
+    </tr>
+  </table>
+
+  <div id="detail" class="card-deck"></div>
+</div>
+</body>
+</html>

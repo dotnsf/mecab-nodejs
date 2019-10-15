@@ -3,6 +3,7 @@
 var express = require( 'express' ),
     bodyParser = require( 'body-parser' ),
     client = require( 'cheerio-httpcli' ),
+    cloudantlib = require( '@cloudant/cloudant' ),
     fs = require( 'fs' ),
     MeCab = require( 'mecab-async' ),
     multer = require( 'multer' ),
@@ -20,6 +21,30 @@ app.use( bodyParser.json() );
 var mecab = new MeCab();
 mecab.command = settings.mecab_command;
 
+var db = null;
+var cloudant = null;
+if( settings.db_username && settings.db_password && settings.db_name ){
+  cloudant = cloudantlib( { account: settings.db_username, password: settings.db_password } );
+  if( cloudant ){
+    cloudant.db.get( settings.db_name, function( err, body ){
+      if( err ){
+        if( err.statusCode == 404 ){
+          cloudant.db.create( settings.db_name, function( err, body ){
+            if( err ){
+              db = null;
+            }else{
+              db = cloudant.db.use( settings.db_name );
+            }
+          });
+        }else{
+          db = cloudant.db.use( settings.db_name );
+        }
+      }else{
+        db = cloudant.db.use( settings.db_name );
+      }
+    });
+  }
+}
 
 app.get( '/get', function( req, res ){
   res.contentType( 'application/json; charset=utf-8' );
@@ -54,6 +79,87 @@ app.get( '/get', function( req, res ){
   }else{
     res.status( 400 );
     res.write( JSON.stringify( { status: false, error: 'no text found.' } ) );
+    res.end();
+  }
+});
+
+app.get( '/byname', function( req, res ){
+  res.contentType( 'application/json; charset=utf-8' );
+
+  var name = req.query.name;
+  if( db ){
+    var q = {
+      selector: {
+        name: { "$eq": name }
+      }
+    };
+    db.find( q ).then( function( body ){
+      var docs = [];
+      var words = [];
+      body.docs.forEach( function( doc ){
+        //. doc = { _id: '_id', filename: 'filename', name: 'name', yyyy: yyyy, nn: nn, datetime: datetime, results: [ { text: 'text', weight: m }, .. ] }
+        //console.log( doc );
+        docs.push( doc );
+
+        doc.results.forEach( function( result ){
+          var b = false;
+          words.forEach( function( word ){
+            if( word.text == result.text ){
+              b = true;
+              word.weight += result.weight;
+            }
+          });
+          if( !b ){
+            words.push( result );
+          }
+        });
+      });
+
+      words.sort( compare );
+      res.write( JSON.stringify( { status: true, docs: docs, words: words } ) );
+      res.end();
+    });
+  }else{
+    res.status( 400 );
+    res.write( JSON.stringify( { status: false, error: 'db not initialized.' } ) );
+    res.end();
+  }
+});
+
+app.get( '/bynameword', function( req, res ){
+  res.contentType( 'application/json; charset=utf-8' );
+
+  var name = req.query.name;
+  var word = req.query.word;
+  if( db ){
+    var q = {
+      selector: {
+        name: { "$eq": name }
+      }
+    };
+    db.find( q ).then( function( body ){
+      var weights = [];
+      body.docs.forEach( function( doc ){
+        //. doc = { _id: '_id', filename: 'filename', name: 'name', yyyy: yyyy, nn: nn, datetime: datetime, results: [ { text: 'text', weight: m }, .. ] }
+        //console.log( doc );
+        var weight = 0;
+        doc.results.forEach( function( result ){
+          if( result.text == word ){
+            weight = result.weight;
+          }
+        });
+
+        var data = { name: name, yyyy: doc.yyyy, nn: doc.nn, weight: weight };
+        weights.push( data );
+      });
+
+      weights.sort( compare2 );
+      res.write( JSON.stringify( { status: true, weights: weights } ) );
+      res.end();
+    });
+  }else{
+    res.status( 400 );
+    res.write( JSON.stringify( { status: false, error: 'db not initialized.' } ) );
     res.end();
   }
 });
@@ -142,6 +248,16 @@ function compare( a, b ){
     return 1;
   }else if( a.weight > b.weight ){
     return -1;
+  }else{
+    return 0;
+  }
+}
+
+function compare2( a, b ){
+  if( a.yyyy + '_' + a.nn < b.yyyy + '_' + b.nn ){
+    return -1;
+  }else if( a.yyyy + '_' + a.nn > b.yyyy + '_' + b.nn ){
+    return 1;
   }else{
     return 0;
   }
