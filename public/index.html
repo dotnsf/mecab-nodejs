@@ -9,6 +9,11 @@
 <script src="//cdnjs.cloudflare.com/ajax/libs/Chart.js/2.1.4/Chart.min.js"></script>
 <script>
 $(function(){
+  var keywords = [ "非接触決済", "キャッシュレス" ];
+  keywords.forEach( function( keyword ){
+    var a = '<a href="#" onClick="clickWord(\'' + keyword + '\');">' + keyword + '</a><br/>';
+    $('#keywords').append( a );
+  });
 });
 
 function send(){
@@ -104,7 +109,13 @@ function removeCard( idx ){
 
   <hr/>
 
-  <div id="result"></div>
+  <table>
+    <tr>
+      <td><div id="result"></div></td>
+      <td id="keywords">
+      </td>
+    </tr>
+  </table>
 
   <div id="detail" class="card-deck"></div>
 </div>

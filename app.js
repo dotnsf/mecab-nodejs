@@ -3,13 +3,19 @@
 var express = require( 'express' ),
     bodyParser = require( 'body-parser' ),
     client = require( 'cheerio-httpcli' ),
+    fs = require( 'fs' ),
     MeCab = require( 'mecab-async' ),
     multer = require( 'multer' ),
+    pdf = require( 'pdf-parse' ),
     settings = require( './settings' ),
     app = express();
 
 app.use( express.Router() );
 app.use( express.static( __dirname + '/public' ) );
+
+var upload = multer( { dest: '../tmp/' } );
+app.use( bodyParser.urlencoded( { limit: '10mb', extended: true } ) );
+app.use( bodyParser.json() );
 
 var mecab = new MeCab();
 mecab.command = settings.mecab_command;
@@ -48,6 +54,51 @@ app.get( '/get', function( req, res ){
   }else{
     res.status( 400 );
     res.write( JSON.stringify( { status: false, error: 'no text found.' } ) );
+    res.end();
+  }
+});
+
+app.post( '/upload', upload.single( 'file' ), function( req, res ){
+  console.log( 'POST /upload' );
+  res.contentType( 'application/json; charset=utf-8' );
+
+  if( req.file && req.file.path ){
+    var path = req.file.path;
+    var filetype = req.file.mimetype;
+    var filename = req.file.originalname;
+
+    if( filetype.indexOf( 'msword' ) >= 0 ){
+    }else if( filetype.indexOf( 'pdf' ) >= 0 ){
+      var buf = fs.readFileSync( path );
+      pdf( buf ).then( function( data ){
+        /*
+        console.log( data.text );
+        res.write( JSON.stringify( { status: true, text: data.text } ) );
+        res.end();
+        */
+        var text = data.text.split( "\n" ).join( '' );
+
+        text2morphs( text ).then( function( results ){
+          res.write( JSON.stringify( { status: true, results: results } ) );
+          res.end();
+        }, function( err ){
+          res.status( 400 );
+          res.write( JSON.stringify( { status: false, error: err } ) );
+          res.end();
+        });
+      }).catch( function( err ){
+        res.status( 400 );
+        res.write( JSON.stringify( { status: false, error: err } ) );
+        res.end();
+      });
+    }else{
+      res.status( 400 );
+      res.write( JSON.stringify( { status: false, error: 'unknown file type.' } ) );
+      res.end();
+    }
+  }else{
+    res.status( 400 );
+    res.write( JSON.stringify( { status: false, error: 'no file found.' } ) );
     res.end();
   }
 });
